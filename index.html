@@ -64,6 +64,7 @@
             cursor: pointer;
             filter: drop-shadow(0 4px 5px rgba(0,0,0,0.25));
             animation: bounce-in 0.5s ease-out;
+            z-index: 5; /* Ensures customers are above furniture */
         }
         @keyframes bounce-in {
             0% { transform: scale(0.5); opacity: 0; }
@@ -91,6 +92,11 @@
             user-select: none;
             filter: drop-shadow(0 2px 3px rgba(0,0,0,0.2));
             transition: transform 0.1s ease-in-out, filter 0.1s ease-in-out;
+        }
+        .furniture img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
         }
         .edit-mode .furniture {
             cursor: grab;
@@ -296,7 +302,7 @@
         const FOOD_EMOJIS = ['☕️', '🥐', '🍰', '🍪', '🍩', '🧃', '🍵', '🥪'];
         const WALL_HEIGHT_PERCENT = 40; // The top 40% of the game area is wall
         const FURNITURE_CATALOG = {
-            'table1': { name: 'Small Table', type: 'table', cost: 0, emoji: '🪵', size: {w: 80, h: 60} },
+            'table1': { name: 'Wooden Table', type: 'table', cost: 0, image: 'assets/Wooden_table.jpg', size: {w: 100, h: 60} },
             'table2': { name: 'Study Desk', type: 'table', cost: 50, emoji: '📚', size: {w: 100, h: 60} },
             'plant1': { name: 'Potted Plant', type: 'decoration', cost: 30, emoji: '🪴', size: {w: 50, h: 50} },
             'counter': { name: 'Service Counter', type: 'counter', cost: 0, emoji: '🏪', size: {w: 150, h: 70} },
@@ -699,7 +705,8 @@
 
         function renderFurniture() {
             (gameState.furniture || []).forEach(item => {
-                const el = document.createElement('div');
+                const el = item.image ? document.createElement('img') : document.createElement('div');
+                
                 el.classList.add('furniture');
                 if (isInEditMode) el.classList.add('editable');
                 el.dataset.id = item.id;
@@ -707,9 +714,15 @@
                 el.style.top = `${item.pos.y}px`;
                 el.style.width = `${item.size.w}px`;
                 el.style.height = `${item.size.h}px`;
-                el.style.fontSize = `${Math.min(item.size.w, item.size.h) * 0.8}px`;
-                el.textContent = item.emoji;
-                el.classList.add('flex', 'items-center', 'justify-center');
+                
+                if (item.image) {
+                    el.src = item.image;
+                } else {
+                    el.style.fontSize = `${Math.min(item.size.w, item.size.h) * 0.8}px`;
+                    el.textContent = item.emoji;
+                    el.classList.add('flex', 'items-center', 'justify-center');
+                }
+                
                 el.style.zIndex = item.type === 'decoration' ? '0' : '1';
                 el.addEventListener('mousedown', startDrag);
                 el.addEventListener('touchstart', startDrag);
@@ -724,7 +737,8 @@
              shopItemsContainer.innerHTML = '';
              const boughtCatalogIds = (gameState.furniture || []).map(f => f.catalogId);
              Object.entries(FURNITURE_CATALOG).forEach(([itemId, item]) => {
-                if (item.cost === 0) return;
+                if (item.cost === 0 && itemId !== 'table1') return; // Hide free items unless it's the default table
+
                 const isUnlocked = (gameState.unlockedItems || []).includes(itemId);
                 const isBought = boughtCatalogIds.includes(itemId) && !item.unlockCost;
                 const canAfford = gameState.knowledgePoints >= item.cost;
@@ -732,10 +746,19 @@
 
                 const itemEl = document.createElement('div');
                 itemEl.className = 'relative flex flex-col items-center p-4 bg-white/70 rounded-xl shadow-sm border-2 border-transparent transition-all';
-                const emojiEl = document.createElement('div'); emojiEl.textContent = item.emoji; emojiEl.className = 'text-5xl mb-2';
+                
+                const visualEl = item.image ? document.createElement('img') : document.createElement('div');
+                if(item.image) {
+                    visualEl.src = item.image;
+                    visualEl.className = 'h-16 w-16 object-contain mb-2';
+                } else {
+                    visualEl.textContent = item.emoji;
+                    visualEl.className = 'text-5xl mb-2';
+                }
+                
                 const nameEl = document.createElement('p'); nameEl.textContent = item.name; nameEl.className = 'font-semibold text-center';
                 
-                itemEl.append(emojiEl, nameEl);
+                itemEl.append(visualEl, nameEl);
 
                 if (isBought) {
                     itemEl.classList.add('opacity-40', 'cursor-not-allowed');
