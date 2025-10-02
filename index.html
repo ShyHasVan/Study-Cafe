@@ -74,16 +74,10 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.5s ease;
             cursor: pointer;
             filter: drop-shadow(0 4px 5px rgba(0,0,0,0.25));
-            animation: bounce-in 0.5s ease-out;
             z-index: 5; /* Ensures customers are above furniture */
-        }
-        @keyframes bounce-in {
-            0% { transform: scale(0.5); opacity: 0; }
-            80% { transform: scale(1.1); opacity: 1; }
-            100% { transform: scale(1); }
+            transition: left 1.5s linear, top 1.5s linear, opacity 0.5s ease, transform 0.5s ease;
         }
         .speech-bubble {
             position: absolute;
@@ -99,6 +93,11 @@
             border: 2px solid #5C3D2E;
             box-shadow: 3px 3px 0 #5C3D2E;
             animation: bounce-in 0.3s ease-out;
+        }
+        @keyframes bounce-in {
+            0% { transform: scale(0.5); opacity: 0; }
+            80% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); }
         }
         .speech-bubble::after { display: none; }
         .furniture {
@@ -133,6 +132,26 @@
         @keyframes pulse-border {
             0%, 100% { opacity: 0.8; transform: scale(1); }
             50% { opacity: 1; transform: scale(1.02); }
+        }
+        .door {
+            position: absolute;
+            width: 60px;
+            height: 100px;
+            background-color: #8B4513; /* SaddleBrown */
+            border: 4px solid #5C3D2E;
+            border-radius: 8px 8px 0 0;
+            z-index: 1;
+        }
+        .door::after {
+            content: '';
+            position: absolute;
+            top: 45px;
+            right: 10px;
+            width: 10px;
+            height: 10px;
+            background-color: #FFD700; /* Gold */
+            border-radius: 50%;
+            border: 1px solid #5C3D2E;
         }
         .shop-item.locked::after {
             content: '🧠';
@@ -316,6 +335,8 @@
         const FOOD_EMOJIS = ['☕️', '🥐', '🍰', '🍪', '🍩', '🧃', '🍵', '🥪'];
         const WALL_HEIGHT_PERCENT = 40; // The top 40% of the game area is wall
         const GRID_SIZE = 20;
+        const DOOR_POS = { x: 20, y: 100 };
+        const WALK_DURATION = 1500;
         const FURNITURE_CATALOG = {
             'table1': { name: 'Wooden Table', type: 'table', cost: 0, image: 'assets/Wooden_table.png', size: {w: 100, h: 60} },
             'table2': { name: 'Study Desk', type: 'table', cost: 50, emoji: '📚', size: {w: 100, h: 60} },
@@ -529,6 +550,15 @@
             if (Math.random() < 0.3) {
                 spawnCustomer();
             }
+
+            // Update customer states
+            const now = Date.now();
+            gameState.customers.forEach(customer => {
+                if (customer.state === 'walking' && now > customer.spawnTime + WALK_DURATION) {
+                    customer.state = 'ordering';
+                }
+            });
+
             updateUI();
         }
 
@@ -544,7 +574,13 @@
                     emoji: ANIMAL_EMOJIS[Math.floor(Math.random() * ANIMAL_EMOJIS.length)],
                     tableId: table.id,
                     order: FOOD_EMOJIS[Math.floor(Math.random() * FOOD_EMOJIS.length)],
-                    state: 'ordering',
+                    state: 'walking',
+                    spawnTime: Date.now(),
+                    pos: { x: DOOR_POS.x + 5, y: DOOR_POS.y },
+                    targetPos: {
+                        x: table.pos.x + (table.size.w / 2) - 25,
+                        y: table.pos.y - 40
+                    }
                 };
                 gameState.customers.push(newCustomer);
                 const greetings = ["Welcome!", "Right this way!", "A table for one?", "Good to see you!"];
@@ -564,11 +600,13 @@
                 if(customerEl) {
                     showPointAnimation(pointsEarned, customerEl.getBoundingClientRect());
                 }
+                
                 setTimeout(() => {
                     gameState.customers = gameState.customers.filter(c => c.id !== customerId);
-                    updateUI(); // Re-render after customer leaves
-                }, 500);
+                }, WALK_DURATION + 500);
+
                 saveGameState();
+                updateUI();
             }
         }
         
@@ -593,33 +631,54 @@
 
         function renderAll() {
             gameArea.innerHTML = '';
+            renderDoor();
             renderFurniture();
             renderHost();
             renderCustomers();
+        }
+        
+        function renderDoor() {
+            const doorEl = document.createElement('div');
+            doorEl.className = 'door';
+            doorEl.style.left = `${DOOR_POS.x}px`;
+            doorEl.style.top = `${DOOR_POS.y}px`;
+            gameArea.appendChild(doorEl);
         }
 
         function renderCustomers() {
             if (!gameState.customers) return;
             gameState.customers.forEach(customer => {
-                const table = gameState.furniture.find(f => f.id === customer.tableId);
-                if (!table) return;
                 const el = document.createElement('div');
                 el.className = 'customer';
                 el.dataset.id = customer.id;
                 el.textContent = customer.emoji;
-                el.style.left = `${table.pos.x + (table.size.w / 2) - 25}px`;
-                el.style.top = `${table.pos.y - 40}px`;
-                el.addEventListener('click', () => serveCustomer(customer.id));
+
+                if (customer.state === 'walking') {
+                    el.style.left = `${customer.pos.x}px`;
+                    el.style.top = `${customer.pos.y}px`;
+                    setTimeout(() => {
+                        el.style.left = `${customer.targetPos.x}px`;
+                        el.style.top = `${customer.targetPos.y}px`;
+                    }, 10);
+                } else {
+                    el.style.left = `${customer.targetPos.x}px`;
+                    el.style.top = `${customer.targetPos.y}px`;
+                }
+                
                 if (customer.state === 'ordering') {
                     const bubble = document.createElement('div');
                     bubble.className = 'speech-bubble';
                     bubble.textContent = customer.order;
                     el.appendChild(bubble);
                 }
+
                 if (customer.state === 'leaving') {
                     el.style.opacity = '0';
-                    el.style.transform = 'scale(0.8)';
+                    el.style.left = `${customer.pos.x}px`;
+                    el.style.top = `${customer.pos.y}px`;
                 }
+
+                el.addEventListener('click', () => serveCustomer(customer.id));
                 gameArea.appendChild(el);
             });
         }
@@ -632,7 +691,7 @@
                 hostEl.className = 'absolute text-5xl';
                 hostEl.style.left = `${counter.pos.x + (counter.size.w / 2) - 30}px`;
                 hostEl.style.top = `${counter.pos.y - 40}px`;
-                hostEl.style.zIndex = '2'; // Ensure host is above decorations but below customers
+                hostEl.style.zIndex = '3';
                 hostEl.style.filter = 'drop-shadow(0 2px 3px rgba(0,0,0,0.2))';
                 gameArea.appendChild(hostEl);
 
