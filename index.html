@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Study Cafe</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.7.0/mammoth.browser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Lilita+One&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #FAF3E3; /* Warmer, cozy cream background */
+            background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23D3C5AA' fill-opacity='0.2'%3E%3Cpath d='M36 34.094c1.3-1.333 2.5-2.967 2.5-4.594 0-1.627-1.2-3.26-2.5-4.594-1.3-1.332-2.5-2.966-2.5-4.593 0-1.627 1.2-3.26 2.5-4.593 1.3-1.333 2.5-2.967 2.5-4.594 0-1.627-1.2-3.26-2.5-4.593-1.3-1.333-2.5-2.967-2.5-4.594 0-1.627 1.2-3.26 2.5-4.593L36 0c-1.3 1.333-2.5 2.967-2.5 4.594 0 1.627 1.2 3.26 2.5 4.593 1.3 1.333 2.5 2.967 2.5 4.594 0 1.627-1.2 3.26-2.5 4.593 1.3 1.333 2.5 2.967 2.5 4.594 0 1.627-1.2 3.26-2.5 4.593-1.3 1.333-2.5 2.967-2.5 4.594 0 1.627 1.2 3.26 2.5 4.593 1.3 1.333 2.5 2.967 2.5 4.594 0 1.627-1.2 3.26-2.5 4.593l.002.002z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        }
+        .game-font {
+            font-family: 'Lilita One', cursive;
+            letter-spacing: 1px;
+            -webkit-text-stroke: 1px rgba(0,0,0,0.1);
+        }
+        .game-container {
+            width: 100%;
+            max-width: 800px;
+            height: 500px;
+            background-color: #D2B48C; /* Tan color for the base */
+            border: 8px solid #5C3D2E;
+            border-radius: 1.5rem;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1), inset 0 0 15px rgba(0,0,0,0.2);
+            /* Herringbone pattern */
+            background-image: repeating-linear-gradient(135deg, #A0765E 0, #A0765E 10px, transparent 10px, transparent 20px),
+                              repeating-linear-gradient(45deg, #A0765E 0, #A0765E 10px, transparent 10px, transparent 20px);
+        }
+        .modal-backdrop {
+            background-color: rgba(0,0,0,0.5);
+            backdrop-filter: blur(4px);
+            z-index: 40;
+        }
+        .modal-content {
+            background: #FFF8E7;
+            border: 4px solid #5C3D2E;
+            box-shadow: 0 0 0 8px rgba(0,0,0,0.05);
+            transform: scale(0.95) rotate(-2deg);
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .modal-backdrop:not(.hidden) .modal-content {
+            transform: scale(1) rotate(0deg);
+        }
+        .customer {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            font-size: 2.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.5s ease;
+            cursor: pointer;
+            filter: drop-shadow(0 4px 5px rgba(0,0,0,0.25));
+            animation: bounce-in 0.5s ease-out;
+        }
+        @keyframes bounce-in {
+            0% { transform: scale(0.5); opacity: 0; }
+            80% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); }
+        }
+        .speech-bubble {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: white;
+            padding: 4px 8px;
+            border-radius: 8px;
+            font-size: 1.5rem;
+            white-space: nowrap;
+            margin-bottom: 8px;
+            border: 2px solid #5C3D2E;
+            box-shadow: 3px 3px 0 #5C3D2E;
+            animation: bounce-in 0.3s ease-out;
+        }
+        .speech-bubble::after { display: none; }
+        .furniture {
+            position: absolute;
+            user-select: none;
+            filter: drop-shadow(0 2px 3px rgba(0,0,0,0.2));
+            transition: transform 0.1s ease-in-out, filter 0.1s ease-in-out;
+        }
+        .edit-mode .furniture {
+            cursor: grab;
+        }
+        .furniture.dragging {
+            cursor: grabbing;
+            z-index: 10;
+            transform: scale(1.05);
+            filter: drop-shadow(0 6px 10px rgba(0,0,0,0.3));
+        }
+        .furniture.editable::after {
+            content: '';
+            position: absolute;
+            inset: -5px;
+            border: 3px dashed rgba(255, 255, 255, 0.9);
+            border-radius: 12px;
+            animation: pulse-border 2s infinite ease-in-out;
+            pointer-events: none;
+        }
+        @keyframes pulse-border {
+            0%, 100% { opacity: 0.8; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.02); }
+        }
+        .shop-item.locked::after {
+            content: '🧠';
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            background-color: #818CF8;
+            color: white;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .point-animation {
+            animation: float-up 1s ease-out forwards;
+            position: absolute;
+            font-size: 1.5rem;
+            pointer-events: none;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+        }
+        @keyframes float-up {
+            0% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-50px); opacity: 0; }
+        }
+        .game-button {
+            color: #5C3D2E;
+            font-size: 1.25rem;
+            padding: 0.5rem 1.5rem;
+            border-radius: 12px;
+            border: 2px solid #5C3D2E;
+            box-shadow: 0 5px 0 0 #5C3D2E;
+            transition: all 0.1s ease-in-out;
+            transform: translateY(0);
+            position: relative;
+        }
+        .game-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 7px 0 0 #5C3D2E;
+        }
+        .game-button:active {
+            transform: translateY(4px);
+            box-shadow: 0 1px 0 0 #5C3D2E;
+        }
+        .btn-green { background-color: #A9D6A9; } /* Sage Green */
+        .btn-blue { background-color: #B4D8E7; } /* Powder Blue */
+        .btn-pink { background-color: #F2C4CE; } /* Dusty Rose */
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div id="loading-overlay" class="fixed inset-0 bg-[#FAF3E3] z-50 flex flex-col items-center justify-center">
+        <h2 class="text-3xl game-font text-[#5C3D2E] mb-4">Loading Study Cafe...</h2>
+        <svg class="animate-spin h-8 w-8 text-[#5C3D2E]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+    </div>
+
+    <div class="w-full max-w-4xl mx-auto">
+        <div class="flex justify-between items-center mb-2 px-2">
+            <h1 class="text-4xl sm:text-5xl game-font text-[#D9534F] drop-shadow-sm">Study Cafe</h1>
+            <div class="flex items-center space-x-2">
+                <div id="currency-display" class="bg-[#FFD700] text-[#8C5B48] font-bold py-2 px-4 rounded-xl shadow-lg text-2xl flex items-center border-4 border-white/50 game-font">
+                    <span class="mr-2 text-2xl">💡</span>
+                    <span id="knowledge-points">0</span>
+                </div>
+                <div id="brainpower-display" class="bg-[#CDB4DB] text-[#5C3D2E] font-bold py-2 px-4 rounded-xl shadow-lg text-2xl flex items-center border-4 border-white/50 game-font">
+                    <span class="mr-2 text-2xl">🧠</span>
+                    <span id="brainpower-points">0</span>
+                </div>
+            </div>
+        </div>
+        <p class="text-center text-xs text-gray-500 mb-2">Your User ID: <span id="user-id-display" class="font-mono"></span></p>
+
+        <div id="game-area" class="game-container"></div>
+
+        <div class="mt-4 flex justify-center space-x-4">
+            <button id="shop-button" class="game-button btn-green game-font">Shop</button>
+            <button id="materials-button" class="game-button btn-blue game-font">Study & Earn 🧠</button>
+            <button id="edit-layout-button" class="game-button btn-pink game-font">Layout</button>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="shop-modal" class="fixed inset-0 modal-backdrop flex items-center justify-center p-4 hidden">
+        <div class="modal-content rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 relative">
+            <h2 class="text-3xl game-font text-center text-[#8C5B48] mb-6">Cafe Upgrades</h2>
+            <div id="shop-items" class="grid grid-cols-2 sm:grid-cols-3 gap-4"></div>
+            <button id="close-shop-button" class="absolute -top-4 -right-4 bg-red-500 hover:bg-red-600 text-white w-10 h-10 rounded-full font-bold text-lg border-2 border-white shadow-lg transition-transform transform hover:scale-110">X</button>
+        </div>
+    </div>
+    <div id="study-modal" class="fixed inset-0 modal-backdrop flex items-center justify-center p-4 hidden">
+        <div class="modal-content rounded-2xl w-full max-w-lg p-6 relative text-center">
+            <button id="close-study-button" class="absolute -top-4 -right-4 bg-red-500 hover:bg-red-600 text-white w-10 h-10 rounded-full font-bold text-lg border-2 border-white shadow-lg transition-transform transform hover:scale-110">X</button>
+            <div id="study-topic-selection">
+                <h2 class="text-3xl game-font text-[#8C5B48] mb-2">Study Time!</h2>
+                <p class="mb-4 text-gray-600">Choose a saved material or enter a new topic.</p>
+                <select id="material-select" class="w-full border-2 border-gray-300 rounded-lg p-2 mb-4 bg-white focus:border-blue-400 focus:ring-blue-200 focus:ring-2"></select>
+                <input type="text" id="study-topic-input" class="w-full border-2 border-gray-300 rounded-lg p-2 mb-4 focus:border-blue-400 focus:ring-blue-200 focus:ring-2" placeholder="Or enter a new topic...">
+                <button id="generate-quiz-button" class="game-button btn-blue w-full game-font">Generate Quiz</button>
+            </div>
+            <div id="study-quiz-area" class="hidden"></div>
+            <div id="study-loading" class="hidden"><div class="flex flex-col items-center justify-center"><svg class="animate-spin -ml-1 mr-3 h-10 w-10 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><p class="mt-4 text-lg font-semibold game-font text-gray-700">Brewing up questions...</p></div></div>
+            <div id="study-error" class="hidden p-4 bg-red-100 text-red-700 rounded-lg"><p>Could not generate quiz. The AI might be busy! Please try again.</p></div>
+        </div>
+    </div>
+    <div id="materials-modal" class="fixed inset-0 modal-backdrop flex items-center justify-center p-4 hidden">
+        <div class="modal-content rounded-2xl w-full max-w-xl p-6 relative">
+            <button id="close-materials-button" class="absolute -top-4 -right-4 bg-red-500 hover:bg-red-600 text-white w-10 h-10 rounded-full font-bold text-lg border-2 border-white shadow-lg transition-transform transform hover:scale-110">X</button>
+            <h2 class="text-3xl game-font text-[#8C5B48] mb-4">Study Materials</h2>
+            <div id="materials-list" class="mb-4 max-h-60 overflow-y-auto bg-gray-50 p-3 rounded-lg border"></div>
+            <div class="border-t pt-4"><h3 class="text-xl game-font text-[#8C5B48] mb-2">Upload New Material</h3>
+                <input type="file" id="file-upload-input" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200 cursor-pointer"/>
+                <p class="text-xs text-gray-500 mt-1">Accepts: .txt, .pdf, .docx files</p>
+                <button id="upload-material-button" class="mt-4 w-full game-button btn-green game-font">Upload</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getStorage, ref, uploadString, getDownloadURL, listAll } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+
+        // --- FIREBASE CONFIG (Paste your actual config here) ---
+       const firebaseConfig = {
+         apiKey: "AIzaSyBuZHS4kZo9PS-V-b77QU6iZwyaR_xm5q4",
+         authDomain: "study-cafe-a5be4.firebaseapp.com",
+         projectId: "study-cafe-a5be4",
+         storageBucket: "study-cafe-a5be4.firebasestorage.app",
+         messagingSenderId: "1019275467223",
+         appId: "1:1019275467223:web:f78bb8ab46d29a14eb1392"
+       };
+
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.worker.min.js`;
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const storage = getStorage(app);
+
+        let userId;
+        let unsubscribeGameState;
+        let gameLoopInterval;
+        let isInEditMode = false;
+        let chefSpeech = { message: '', expiry: 0 };
+
+        // DOM Elements
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const knowledgePointsEl = document.getElementById('knowledge-points');
+        const brainpowerPointsEl = document.getElementById('brainpower-points');
+        const gameArea = document.getElementById('game-area');
+        const shopButton = document.getElementById('shop-button');
+        const materialsButton = document.getElementById('materials-button');
+        const editLayoutButton = document.getElementById('edit-layout-button');
+        const shopModal = document.getElementById('shop-modal');
+        const closeShopButton = document.getElementById('close-shop-button');
+        const shopItemsContainer = document.getElementById('shop-items');
+        const studyModal = document.getElementById('study-modal');
+        const closeStudyButton = document.getElementById('close-study-button');
+        const studyTopicSelection = document.getElementById('study-topic-selection');
+        const studyTopicInput = document.getElementById('study-topic-input');
+        const generateQuizButton = document.getElementById('generate-quiz-button');
+        const studyQuizArea = document.getElementById('study-quiz-area');
+        const studyLoading = document.getElementById('study-loading');
+        const studyError = document.getElementById('study-error');
+        const materialsModal = document.getElementById('materials-modal');
+        const closeMaterialsButton = document.getElementById('close-materials-button');
+        const materialsList = document.getElementById('materials-list');
+        const fileUploadInput = document.getElementById('file-upload-input');
+        const uploadMaterialButton = document.getElementById('upload-material-button');
+        const materialSelect = document.getElementById('material-select');
+        const userIdDisplay = document.getElementById('user-id-display');
+
+        // Game State & Config
+        let gameState = { knowledgePoints: 0, brainpower: 0, furniture: [], customers: [], itemToUnlock: null };
+        const ANIMAL_EMOJIS = ['🦉', '🦊', '🐰', '🐻', '🐼', '🐸', '🐵', '🐯', '🦁', '🐨'];
+        const FOOD_EMOJIS = ['☕️', '🥐', '🍰', '🍪', '🍩', '🧃', '🍵', '🥪'];
+        const FURNITURE_CATALOG = {
+            'table1': { name: 'Small Table', type: 'table', cost: 0, emoji: '🪵', size: {w: 80, h: 60} },
+            'table2': { name: 'Study Desk', type: 'table', cost: 50, emoji: '📚', size: {w: 100, h: 60} },
+            'plant1': { name: 'Potted Plant', type: 'decoration', cost: 30, emoji: '🪴', size: {w: 50, h: 50} },
+            'counter': { name: 'Service Counter', type: 'counter', cost: 0, emoji: '🏪', size: {w: 150, h: 70} },
+            'bookshelf': { name: 'Bookshelf', type: 'decoration', cost: 200, emoji: '📙', size: {w: 80, h: 120}},
+            'armchair': { name: 'Cozy Armchair', type: 'decoration', cost: 100, unlockCost: 20, emoji: '🛋️', size: {w: 70, h: 70} },
+            'fairy_lights': { name: 'Fairy Lights', type: 'decoration', cost: 150, unlockCost: 30, emoji: '✨', size: {w: 120, h: 40} },
+        };
+        const GAME_TICK = 2000; // ms
+
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                userId = user.uid;
+                userIdDisplay.textContent = userId;
+                await setupGameListeners();
+                setTimeout(() => loadingOverlay.classList.add('hidden'), 500);
+            } else {
+                signInAnonymously(auth).catch(err => console.error("Anonymous sign-in failed", err));
+            }
+        });
+
+        async function setupGameListeners() {
+            if (unsubscribeGameState) unsubscribeGameState();
+            const docRef = doc(db, `users/${userId}/gameState/main`);
+            unsubscribeGameState = onSnapshot(docRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    gameState = docSnap.data();
+                    if (!gameState.customers) gameState.customers = [];
+                    if (!gameState.brainpower) gameState.brainpower = 0;
+                } else {
+                    gameState = createInitialGameState();
+                    saveGameState();
+                }
+                updateUI();
+            });
+            await loadStudyMaterials();
+            startGameLoop();
+        }
+        
+        function createInitialGameState() {
+            const tableTemplate = FURNITURE_CATALOG['table1'];
+            const counterTemplate = FURNITURE_CATALOG['counter'];
+            const initialFurniture = [
+                { ...tableTemplate, id: 'table1_1', catalogId: 'table1', pos: { x: 100, y: 100 } },
+                { ...tableTemplate, id: 'table1_2', catalogId: 'table1', pos: { x: 300, y: 100 } },
+                { ...tableTemplate, id: 'table1_3', catalogId: 'table1', pos: { x: 550, y: 100 } },
+                { ...tableTemplate, id: 'table1_4', catalogId: 'table1', pos: { x: 100, y: 250 } },
+                { ...counterTemplate, id: 'counter_1', catalogId: 'counter', pos: { x: 325, y: 400 } }
+            ];
+            return {
+                knowledgePoints: 0,
+                brainpower: 0,
+                furniture: initialFurniture,
+                customers: [],
+                unlockedItems: ['table1', 'counter', 'table2', 'plant1', 'bookshelf'],
+            };
+        }
+
+        function startGameLoop() {
+            if (gameLoopInterval) clearInterval(gameLoopInterval);
+            gameLoopInterval = setInterval(gameTick, GAME_TICK);
+        }
+
+        async function saveGameState(isLocal = false) {
+            if (!userId) return;
+            updateUI(); 
+            if (!isLocal) {
+                 const docRef = doc(db, `users/${userId}/gameState/main`);
+                 await setDoc(docRef, gameState, { merge: true });
+            }
+        }
+
+        async function generateQuizFromTopic(topic, context = "") {
+            studyTopicSelection.classList.add('hidden');
+            studyError.classList.add('hidden');
+            studyLoading.classList.remove('hidden');
+
+            const apiKey = "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+            
+            const systemPrompt = `You are an AI study assistant. Your task is to generate a 5-question multiple-choice quiz based on a given topic and optional context. The questions should be clear, relevant, and suitable for a high-school or early college student. Each question must have 4 options. Provide a brief but helpful explanation for the correct answer. The user MUST get 3 out of 5 questions correct to pass.`;
+            let userPrompt = `Topic: ${topic}`;
+            if (context) {
+                userPrompt += `\n\nContext from user's study material:\n---${context.substring(0, 15000)}\n---`;
+            }
+
+            const payload = {
+                contents: [{ parts: [{ text: userPrompt }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                            "quiz": {
+                                type: "ARRAY",
+                                items: {
+                                    type: "OBJECT",
+                                    properties: {
+                                        "question": { "type": "STRING" },
+                                        "options": { "type": "ARRAY", "items": { "type": "STRING" } },
+                                        "correctAnswer": { "type": "STRING" },
+                                        "explanation": { "type": "STRING" }
+                                    },
+                                    required: ["question", "options", "correctAnswer", "explanation"]
+                                }
+                            }
+                        },
+                        required: ["quiz"]
+                    }
+                }
+            };
+
+            try {
+                const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (!response.ok) throw new Error(`API Error: ${response.statusText}`);
+                const result = await response.json();
+                const jsonText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (!jsonText) throw new Error("Invalid response structure from API.");
+                const quizData = JSON.parse(jsonText);
+                if (!quizData.quiz || quizData.quiz.length === 0) throw new Error("API returned an empty quiz.");
+                displayQuiz(quizData.quiz);
+            } catch (error) {
+                console.error("Failed to generate quiz:", error);
+                studyLoading.classList.add('hidden');
+                studyError.classList.remove('hidden');
+                setTimeout(() => {
+                    studyError.classList.add('hidden');
+                    studyTopicSelection.classList.remove('hidden');
+                }, 3000);
+            }
+        }
+
+        function displayQuiz(questions) {
+            studyLoading.classList.add('hidden');
+            studyQuizArea.classList.remove('hidden');
+            studyQuizArea.innerHTML = '';
+            let currentQuestionIndex = 0, score = 0;
+            
+            function showQuestion() {
+                if(currentQuestionIndex >= questions.length) {
+                    finishQuiz();
+                    return;
+                }
+                const q = questions[currentQuestionIndex];
+                const shuffledOptions = [...q.options].sort(() => Math.random() - 0.5);
+                studyQuizArea.innerHTML = `<div class="text-left">
+                    <p class="text-lg font-semibold mb-4">${currentQuestionIndex + 1}. ${q.question}</p>
+                    <div class="grid grid-cols-1 gap-3">
+                        ${shuffledOptions.map(opt => `<button class="option-btn w-full text-left p-3 bg-white rounded-lg border-2 hover:bg-blue-100 hover:border-blue-400 transition-all">${opt}</button>`).join('')}
+                    </div>
+                </div>`;
+                document.querySelectorAll('.option-btn').forEach(btn => btn.addEventListener('click', handleAnswer));
+            }
+
+            function handleAnswer(e) {
+                const selectedAnswer = e.target.textContent;
+                const question = questions[currentQuestionIndex];
+                document.querySelectorAll('.option-btn').forEach(btn => {
+                    btn.disabled = true;
+                    if (btn.textContent === question.correctAnswer) {
+                        btn.classList.add('bg-green-200', 'border-green-500');
+                    } else if (btn.textContent === selectedAnswer) {
+                        btn.classList.add('bg-red-200', 'border-red-500');
+                    }
+                });
+
+                if (selectedAnswer === question.correctAnswer) score++;
+                
+                const explanationEl = document.createElement('div');
+                explanationEl.className = 'mt-4 p-3 bg-yellow-100 rounded-lg text-left';
+                explanationEl.innerHTML = `<p><strong class="font-bold">Explanation:</strong> ${question.explanation}</p>`;
+                studyQuizArea.appendChild(explanationEl);
+
+                currentQuestionIndex++;
+                setTimeout(showQuestion, 3000);
+            }
+
+            function finishQuiz() {
+                const success = score >= 3;
+                let resultHTML = `<h2 class="text-2xl game-font text-[#8C5B48] mb-2">Quiz Complete!</h2>
+                                  <p class="text-lg mb-4">You scored ${score} out of ${questions.length}.</p>`;
+                if (success) {
+                    const brainpowerEarned = 10;
+                    gameState.brainpower += brainpowerEarned;
+                    resultHTML += `<p class="text-green-600 font-semibold mb-4">Great job! You earned ${brainpowerEarned} 🧠 Brainpower!</p>`;
+                    saveGameState();
+                } else {
+                    resultHTML += `<p class="text-red-600 font-semibold mb-4">Good effort! Pass the quiz to earn Brainpower.</p>`;
+                }
+                resultHTML += `<button id="finish-quiz-btn" class="game-button btn-blue game-font">Back to Cafe</button>`;
+                studyQuizArea.innerHTML = resultHTML;
+                document.getElementById('finish-quiz-btn').addEventListener('click', closeStudy);
+            }
+            showQuestion();
+        }
+
+        function closeStudy() {
+            studyModal.classList.add('hidden');
+            setTimeout(() => {
+                studyQuizArea.classList.add('hidden');
+                studyTopicSelection.classList.remove('hidden');
+                studyTopicInput.value = '';
+            }, 300);
+        }
+
+        function gameTick() {
+            if (isInEditMode) return;
+            if (Math.random() < 0.3) {
+                spawnCustomer();
+            }
+            updateUI();
+        }
+
+        function spawnCustomer() {
+            const tables = gameState.furniture.filter(f => f.type === 'table');
+            const occupiedTableIds = gameState.customers.map(c => c.tableId);
+            const availableTables = tables.filter(t => !occupiedTableIds.includes(t.id));
+
+            if (availableTables.length > 0) {
+                const table = availableTables[Math.floor(Math.random() * availableTables.length)];
+                const newCustomer = {
+                    id: `cust-${Date.now()}`,
+                    emoji: ANIMAL_EMOJIS[Math.floor(Math.random() * ANIMAL_EMOJIS.length)],
+                    tableId: table.id,
+                    order: FOOD_EMOJIS[Math.floor(Math.random() * FOOD_EMOJIS.length)],
+                    state: 'ordering',
+                };
+                gameState.customers.push(newCustomer);
+                const greetings = ["Welcome!", "Right this way!", "A table for one?", "Good to see you!"];
+                chefSpeech.message = greetings[Math.floor(Math.random() * greetings.length)];
+                chefSpeech.expiry = Date.now() + 3000;
+            }
+        }
+
+        function serveCustomer(customerId) {
+            if (isInEditMode) return;
+            const customer = gameState.customers.find(c => c.id === customerId);
+            if (customer && customer.state === 'ordering') {
+                customer.state = 'leaving';
+                const pointsEarned = 10;
+                gameState.knowledgePoints += pointsEarned;
+                const customerEl = document.querySelector(`[data-id="${customerId}"]`);
+                if(customerEl) {
+                    showPointAnimation(pointsEarned, customerEl.getBoundingClientRect());
+                }
+                setTimeout(() => {
+                    gameState.customers = gameState.customers.filter(c => c.id !== customerId);
+                    saveGameState(true);
+                }, 500);
+                saveGameState(true);
+            }
+        }
+        
+        function showPointAnimation(amount, rect, isBrainpower = false) {
+             const pointEl = document.createElement('div');
+             pointEl.textContent = isBrainpower ? `🧠+${amount}` : `💡+${amount}`;
+             pointEl.className = 'point-animation';
+             if(isBrainpower) pointEl.style.color = '#8b5cf6'; else pointEl.style.color = '#f59e0b';
+             const gameRect = gameArea.getBoundingClientRect();
+             pointEl.style.left = `${rect.left - gameRect.left + (rect.width / 2) - 15}px`;
+             pointEl.style.top = `${rect.top - gameRect.top}px`;
+             gameArea.appendChild(pointEl);
+             setTimeout(() => pointEl.remove(), 1000);
+        }
+
+        function updateUI() {
+            if (!gameState) return;
+            knowledgePointsEl.textContent = gameState.knowledgePoints;
+            brainpowerPointsEl.textContent = gameState.brainpower;
+            renderAll();
+        }
+
+        function renderAll() {
+            gameArea.innerHTML = '';
+            renderFurniture();
+            renderHost();
+            renderCustomers();
+        }
+
+        function renderCustomers() {
+            if (!gameState.customers) return;
+            gameState.customers.forEach(customer => {
+                const table = gameState.furniture.find(f => f.id === customer.tableId);
+                if (!table) return;
+                const el = document.createElement('div');
+                el.className = 'customer';
+                el.dataset.id = customer.id;
+                el.textContent = customer.emoji;
+                el.style.left = `${table.pos.x + (table.size.w / 2) - 25}px`;
+                el.style.top = `${table.pos.y - 40}px`;
+                el.addEventListener('click', () => serveCustomer(customer.id));
+                if (customer.state === 'ordering') {
+                    const bubble = document.createElement('div');
+                    bubble.className = 'speech-bubble';
+                    bubble.textContent = customer.order;
+                    el.appendChild(bubble);
+                }
+                if (customer.state === 'leaving') {
+                    el.style.opacity = '0';
+                    el.style.transform = 'scale(0.8)';
+                }
+                gameArea.appendChild(el);
+            });
+        }
+
+        function renderHost() {
+            const counter = (gameState.furniture || []).find(f => f.catalogId === 'counter');
+            if (counter) {
+                const hostEl = document.createElement('div');
+                hostEl.textContent = '🧑‍🍳';
+                hostEl.className = 'absolute text-5xl';
+                hostEl.style.left = `${counter.pos.x + (counter.size.w / 2) - 30}px`;
+                hostEl.style.top = `${counter.pos.y - 40}px`;
+                hostEl.style.zIndex = '0';
+                hostEl.style.filter = 'drop-shadow(0 2px 3px rgba(0,0,0,0.2))';
+                gameArea.appendChild(hostEl);
+
+                if (chefSpeech.message && Date.now() < chefSpeech.expiry) {
+                    const bubble = document.createElement('div');
+                    bubble.className = 'speech-bubble';
+                    bubble.textContent = chefSpeech.message;
+                    bubble.style.bottom = '90%';
+                    bubble.style.transform = 'translateX(-50%) scale(0.9)';
+                    hostEl.appendChild(bubble);
+                } else {
+                    chefSpeech.message = '';
+                }
+            }
+        }
+
+        function toggleEditMode() {
+            isInEditMode = !isInEditMode;
+            gameArea.classList.toggle('edit-mode');
+            if (isInEditMode) {
+                editLayoutButton.textContent = 'Done';
+                document.querySelectorAll('.furniture').forEach(f => f.classList.add('editable'));
+            } else {
+                editLayoutButton.textContent = 'Layout';
+                document.querySelectorAll('.furniture').forEach(f => f.classList.remove('editable'));
+                saveGameState();
+            }
+        }
+
+        let dragTarget = null;
+        let offset = { x: 0, y: 0 };
+        
+        function startDrag(e) {
+            if (!isInEditMode) return;
+            e.preventDefault();
+            e.stopPropagation();
+            dragTarget = e.target;
+            dragTarget.classList.add('dragging');
+            let clientX = e.clientX || e.touches[0].clientX;
+            let clientY = e.clientY || e.touches[0].clientY;
+            const rect = dragTarget.getBoundingClientRect();
+            offset.x = clientX - rect.left;
+            offset.y = clientY - rect.top;
+            document.addEventListener('mousemove', drag);
+            document.addEventListener('touchmove', drag, { passive: false });
+            document.addEventListener('mouseup', endDrag);
+            document.addEventListener('touchend', endDrag);
+        }
+        function drag(e) {
+            if (!dragTarget) return;
+            e.preventDefault();
+            let clientX = e.clientX || e.touches[0].clientX;
+            let clientY = e.clientY || e.touches[0].clientY;
+            const gameRect = gameArea.getBoundingClientRect();
+            let newX = clientX - gameRect.left - offset.x;
+            let newY = clientY - gameRect.top - offset.y;
+            newX = Math.max(0, Math.min(newX, gameArea.offsetWidth - dragTarget.offsetWidth));
+            newY = Math.max(0, Math.min(newY, gameArea.offsetHeight - dragTarget.offsetHeight));
+            dragTarget.style.left = `${newX}px`;
+            dragTarget.style.top = `${newY}px`;
+        }
+        function endDrag() {
+            if (!dragTarget) return;
+            dragTarget.classList.remove('dragging');
+            const itemId = dragTarget.dataset.id;
+            const furnitureItem = gameState.furniture.find(f => f.id === itemId);
+            if (furnitureItem) {
+                furnitureItem.pos.x = parseInt(dragTarget.style.left);
+                furnitureItem.pos.y = parseInt(dragTarget.style.top);
+            }
+            dragTarget = null;
+            document.removeEventListener('mousemove', drag);
+            document.removeEventListener('touchmove', drag);
+            document.removeEventListener('mouseup', endDrag);
+            document.removeEventListener('touchend', endDrag);
+        }
+
+        function renderFurniture() {
+            (gameState.furniture || []).forEach(item => {
+                const el = document.createElement('div');
+                el.classList.add('furniture');
+                if (isInEditMode) el.classList.add('editable');
+                el.dataset.id = item.id;
+                el.style.left = `${item.pos.x}px`;
+                el.style.top = `${item.pos.y}px`;
+                el.style.width = `${item.size.w}px`;
+                el.style.height = `${item.size.h}px`;
+                el.style.fontSize = `${Math.min(item.size.w, item.size.h) * 0.8}px`;
+                el.textContent = item.emoji;
+                el.classList.add('flex', 'items-center', 'justify-center');
+                el.style.zIndex = item.type === 'decoration' ? '0' : '1';
+                el.addEventListener('mousedown', startDrag);
+                el.addEventListener('touchstart', startDrag);
+                gameArea.appendChild(el);
+            });
+        }
+
+        function openShop() { renderShop(); shopModal.classList.remove('hidden'); }
+        function closeShop() { shopModal.classList.add('hidden'); }
+        
+        function renderShop() {
+             shopItemsContainer.innerHTML = '';
+             const boughtCatalogIds = (gameState.furniture || []).map(f => f.catalogId);
+             Object.entries(FURNITURE_CATALOG).forEach(([itemId, item]) => {
+                if (item.cost === 0) return;
+                const isUnlocked = (gameState.unlockedItems || []).includes(itemId);
+                const isBought = boughtCatalogIds.includes(itemId) && !item.unlockCost;
+                const canAfford = gameState.knowledgePoints >= item.cost;
+                const canAffordUnlock = gameState.brainpower >= (item.unlockCost || 0);
+
+                const itemEl = document.createElement('div');
+                itemEl.className = 'relative flex flex-col items-center p-4 bg-white/70 rounded-xl shadow-sm border-2 border-transparent transition-all';
+                const emojiEl = document.createElement('div'); emojiEl.textContent = item.emoji; emojiEl.className = 'text-5xl mb-2';
+                const nameEl = document.createElement('p'); nameEl.textContent = item.name; nameEl.className = 'font-semibold text-center';
+                
+                itemEl.append(emojiEl, nameEl);
+
+                if (isBought) {
+                    itemEl.classList.add('opacity-40', 'cursor-not-allowed');
+                } else if (!isUnlocked) {
+                    itemEl.classList.add('locked', 'cursor-pointer');
+                    const unlockCostEl = document.createElement('div');
+                    unlockCostEl.className = `flex items-center font-bold mt-1 game-font ${canAffordUnlock ? 'text-purple-600' : 'text-red-500'}`;
+                    unlockCostEl.innerHTML = `🧠 ${item.unlockCost}`;
+                    itemEl.appendChild(unlockCostEl);
+                    if (canAffordUnlock) {
+                        itemEl.classList.add('hover:bg-indigo-100', 'hover:border-indigo-400');
+                        itemEl.addEventListener('click', () => unlockItem(itemId));
+                    }
+                } else {
+                    const costEl = document.createElement('div');
+                    costEl.className = `flex items-center font-bold mt-1 game-font ${canAfford ? 'text-yellow-600' : 'text-red-500'}`;
+                    costEl.innerHTML = `💡 ${item.cost}`;
+                    itemEl.appendChild(costEl);
+                    if(canAfford){
+                         itemEl.classList.add('hover:bg-green-100', 'hover:border-green-400', 'cursor-pointer');
+                         itemEl.addEventListener('click', () => buyItem(itemId));
+                    } else {
+                         itemEl.classList.add('opacity-50', 'cursor-not-allowed');
+                    }
+                }
+                shopItemsContainer.appendChild(itemEl);
+            });
+        }
+        
+        function unlockItem(itemId) {
+            const item = FURNITURE_CATALOG[itemId];
+            if (item && gameState.brainpower >= item.unlockCost) {
+                gameState.brainpower -= item.unlockCost;
+                gameState.unlockedItems.push(itemId);
+                saveGameState();
+                renderShop();
+            }
+        }
+
+        function buyItem(itemId) {
+            const item = FURNITURE_CATALOG[itemId];
+            if (item && (gameState.unlockedItems || []).includes(itemId) && gameState.knowledgePoints >= item.cost) {
+                gameState.knowledgePoints -= item.cost;
+                if (!gameState.furniture) gameState.furniture = [];
+                const newItem = { id: `${itemId}_${Date.now()}`, catalogId: itemId, ...item, pos: { x: 50, y: 50 } };
+                gameState.furniture.push(newItem);
+                saveGameState();
+                closeShop();
+            }
+        }
+
+        async function loadStudyMaterials() {
+            const userMaterialsRef = ref(storage, `users/${userId}/materials`);
+            const res = await listAll(userMaterialsRef);
+            materialsList.innerHTML = '';
+            materialSelect.innerHTML = '<option value="">Select a saved material...</option>';
+            if (res.items.length === 0) {
+                materialsList.innerHTML = '<p class="text-gray-500 text-sm">No materials uploaded yet.</p>';
+                return;
+            }
+            res.items.forEach(itemRef => {
+                const li = document.createElement('li');
+                li.className = 'text-gray-700';
+                li.textContent = itemRef.name;
+                materialsList.appendChild(li);
+
+                const option = document.createElement('option');
+                option.value = itemRef.fullPath;
+                option.textContent = itemRef.name;
+                materialSelect.appendChild(option);
+            });
+        }
+
+        async function handleFileUpload() {
+            const file = fileUploadInput.files[0];
+            if (!file) return;
+            uploadMaterialButton.disabled = true;
+            uploadMaterialButton.textContent = 'Uploading...';
+            try {
+                let content = '';
+                if (file.type === 'text/plain') {
+                    content = await file.text();
+                } else if (file.type === 'application/pdf') {
+                    const reader = new FileReader();
+                    reader.onload = async (e) => {
+                        const pdf = await pdfjsLib.getDocument(e.target.result).promise;
+                        let textContent = '';
+                        for (let i = 1; i <= pdf.numPages; i++) {
+                            const page = await pdf.getPage(i);
+                            const text = await page.getTextContent();
+                            textContent += text.items.map(s => s.str).join(' ');
+                        }
+                        await uploadTextAsFile(file.name, textContent);
+                    };
+                    reader.readAsArrayBuffer(file);
+                    return; // Return early as the upload happens in the onload
+                } else if (file.name.endsWith('.docx')) {
+                     const arrayBuffer = await file.arrayBuffer();
+                     const result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
+                     content = result.value;
+                } else {
+                    throw new Error("Unsupported file type");
+                }
+                await uploadTextAsFile(file.name, content);
+            } catch (error) {
+                console.error("File processing error:", error);
+                alert("Error processing file. Please try again.");
+            } finally {
+                uploadMaterialButton.disabled = false;
+                uploadMaterialButton.textContent = 'Upload';
+            }
+        }
+
+        async function uploadTextAsFile(fileName, content) {
+            const materialRef = ref(storage, `users/${userId}/materials/${fileName.replace(/\.[^/.]+$/, "")}.txt`);
+            await uploadString(materialRef, content);
+            fileUploadInput.value = '';
+            await loadStudyMaterials();
+        }
+
+        // --- Event Listeners ---
+        shopButton.addEventListener('click', openShop);
+        closeShopButton.addEventListener('click', closeShop);
+        editLayoutButton.addEventListener('click', toggleEditMode);
+        materialsButton.addEventListener('click', () => { materialsModal.classList.remove('hidden'); });
+        closeMaterialsButton.addEventListener('click', () => { materialsModal.classList.add('hidden'); });
+        uploadMaterialButton.addEventListener('click', handleFileUpload);
+        generateQuizButton.addEventListener('click', async () => {
+            const topic = studyTopicInput.value.trim();
+            const selectedMaterialPath = materialSelect.value;
+            if (!topic && !selectedMaterialPath) {
+                alert("Please enter a topic or select a study material.");
+                return;
+            }
+            let context = "";
+            if (selectedMaterialPath) {
+                const url = await getDownloadURL(ref(storage, selectedMaterialPath));
+                const response = await fetch(url);
+                context = await response.text();
+            }
+            const finalTopic = topic || selectedMaterialPath.split('/').pop().replace('.txt', '');
+            generateQuizFromTopic(finalTopic, context);
+        });
+        closeStudyButton.addEventListener('click', closeStudy);
+    </script>
+</body>
+</html>
+
