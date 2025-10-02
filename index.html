@@ -25,15 +25,17 @@
             width: 100%;
             max-width: 800px;
             height: 500px;
-            background-color: #D2B48C; /* Tan color for the base */
+            background-color: #D2B48C;
             border: 8px solid #5C3D2E;
             border-radius: 1.5rem;
             position: relative;
             overflow: hidden;
             box-shadow: 0 10px 20px rgba(0,0,0,0.1), inset 0 0 15px rgba(0,0,0,0.2);
-            /* Herringbone pattern */
-            background-image: repeating-linear-gradient(135deg, #A0765E 0, #A0765E 10px, transparent 10px, transparent 20px),
-                              repeating-linear-gradient(45deg, #A0765E 0, #A0765E 10px, transparent 10px, transparent 20px);
+            /* New background with your images */
+            background-image: url('assets/Old_wall.png'), url('assets/Wooden_floor.jpg');
+            background-position: top, bottom;
+            background-repeat: no-repeat;
+            background-size: 100% 40%, 100% 60%;
         }
         .modal-backdrop {
             background-color: rgba(0,0,0,0.5);
@@ -292,6 +294,7 @@
         let gameState = { knowledgePoints: 0, brainpower: 0, furniture: [], customers: [], itemToUnlock: null };
         const ANIMAL_EMOJIS = ['🦉', '🦊', '🐰', '🐻', '🐼', '🐸', '🐵', '🐯', '🦁', '🐨'];
         const FOOD_EMOJIS = ['☕️', '🥐', '🍰', '🍪', '🍩', '🧃', '🍵', '🥪'];
+        const WALL_HEIGHT_PERCENT = 40; // The top 40% of the game area is wall
         const FURNITURE_CATALOG = {
             'table1': { name: 'Small Table', type: 'table', cost: 0, emoji: '🪵', size: {w: 80, h: 60} },
             'table2': { name: 'Study Desk', type: 'table', cost: 50, emoji: '📚', size: {w: 100, h: 60} },
@@ -335,11 +338,12 @@
         function createInitialGameState() {
             const tableTemplate = FURNITURE_CATALOG['table1'];
             const counterTemplate = FURNITURE_CATALOG['counter'];
+            // Adjusted Y positions to be on the floor
             const initialFurniture = [
-                { ...tableTemplate, id: 'table1_1', catalogId: 'table1', pos: { x: 100, y: 100 } },
-                { ...tableTemplate, id: 'table1_2', catalogId: 'table1', pos: { x: 300, y: 100 } },
-                { ...tableTemplate, id: 'table1_3', catalogId: 'table1', pos: { x: 550, y: 100 } },
-                { ...tableTemplate, id: 'table1_4', catalogId: 'table1', pos: { x: 100, y: 250 } },
+                { ...tableTemplate, id: 'table1_1', catalogId: 'table1', pos: { x: 100, y: 220 } },
+                { ...tableTemplate, id: 'table1_2', catalogId: 'table1', pos: { x: 300, y: 220 } },
+                { ...tableTemplate, id: 'table1_3', catalogId: 'table1', pos: { x: 550, y: 220 } },
+                { ...tableTemplate, id: 'table1_4', catalogId: 'table1', pos: { x: 100, y: 350 } },
                 { ...counterTemplate, id: 'counter_1', catalogId: 'counter', pos: { x: 325, y: 400 } }
             ];
             return {
@@ -358,7 +362,7 @@
 
         async function saveGameState(isLocal = false) {
             if (!userId) return;
-            updateUI(); 
+            // Removed updateUI() from here to prevent render loops
             if (!isLocal) {
                  const docRef = doc(db, `users/${userId}/gameState/main`);
                  await setDoc(docRef, gameState, { merge: true });
@@ -541,9 +545,9 @@
                 }
                 setTimeout(() => {
                     gameState.customers = gameState.customers.filter(c => c.id !== customerId);
-                    saveGameState(true);
+                    updateUI(); // Re-render after customer leaves
                 }, 500);
-                saveGameState(true);
+                saveGameState();
             }
         }
         
@@ -656,6 +660,7 @@
             document.addEventListener('mouseup', endDrag);
             document.addEventListener('touchend', endDrag);
         }
+
         function drag(e) {
             if (!dragTarget) return;
             e.preventDefault();
@@ -664,11 +669,18 @@
             const gameRect = gameArea.getBoundingClientRect();
             let newX = clientX - gameRect.left - offset.x;
             let newY = clientY - gameRect.top - offset.y;
+
+            // Constrain X to game area boundaries
             newX = Math.max(0, Math.min(newX, gameArea.offsetWidth - dragTarget.offsetWidth));
-            newY = Math.max(0, Math.min(newY, gameArea.offsetHeight - dragTarget.offsetHeight));
+
+            // Constrain Y to the floor area
+            const wallBoundaryY = gameArea.offsetHeight * (WALL_HEIGHT_PERCENT / 100);
+            newY = Math.max(wallBoundaryY, Math.min(newY, gameArea.offsetHeight - dragTarget.offsetHeight));
+
             dragTarget.style.left = `${newX}px`;
             dragTarget.style.top = `${newY}px`;
         }
+
         function endDrag() {
             if (!dragTarget) return;
             dragTarget.classList.remove('dragging');
@@ -768,7 +780,7 @@
             if (item && (gameState.unlockedItems || []).includes(itemId) && gameState.knowledgePoints >= item.cost) {
                 gameState.knowledgePoints -= item.cost;
                 if (!gameState.furniture) gameState.furniture = [];
-                const newItem = { id: `${itemId}_${Date.now()}`, catalogId: itemId, ...item, pos: { x: 50, y: 50 } };
+                const newItem = { id: `${itemId}_${Date.now()}`, catalogId: itemId, ...item, pos: { x: 50, y: 210 } }; // Ensure new items spawn on floor
                 gameState.furniture.push(newItem);
                 saveGameState();
                 closeShop();
@@ -776,6 +788,7 @@
         }
 
         async function loadStudyMaterials() {
+            if (!userId) return;
             const userMaterialsRef = ref(storage, `users/${userId}/materials`);
             const res = await listAll(userMaterialsRef);
             materialsList.innerHTML = '';
@@ -819,18 +832,18 @@
                         await uploadTextAsFile(file.name, textContent);
                     };
                     reader.readAsArrayBuffer(file);
-                    return; // Return early as the upload happens in the onload
+                    return;
                 } else if (file.name.endsWith('.docx')) {
                      const arrayBuffer = await file.arrayBuffer();
                      const result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
                      content = result.value;
                 } else {
+                    alert("Unsupported file type. Please use .txt, .pdf, or .docx");
                     throw new Error("Unsupported file type");
                 }
                 await uploadTextAsFile(file.name, content);
             } catch (error) {
                 console.error("File processing error:", error);
-                alert("Error processing file. Please try again.");
             } finally {
                 uploadMaterialButton.disabled = false;
                 uploadMaterialButton.textContent = 'Upload';
@@ -842,13 +855,14 @@
             await uploadString(materialRef, content);
             fileUploadInput.value = '';
             await loadStudyMaterials();
+            materialsModal.classList.add('hidden');
         }
 
         // --- Event Listeners ---
         shopButton.addEventListener('click', openShop);
         closeShopButton.addEventListener('click', closeShop);
         editLayoutButton.addEventListener('click', toggleEditMode);
-        materialsButton.addEventListener('click', () => { materialsModal.classList.remove('hidden'); });
+        materialsButton.addEventListener('click', () => { studyModal.classList.remove('hidden'); });
         closeMaterialsButton.addEventListener('click', () => { materialsModal.classList.add('hidden'); });
         uploadMaterialButton.addEventListener('click', handleFileUpload);
         generateQuizButton.addEventListener('click', async () => {
@@ -860,9 +874,15 @@
             }
             let context = "";
             if (selectedMaterialPath) {
-                const url = await getDownloadURL(ref(storage, selectedMaterialPath));
-                const response = await fetch(url);
-                context = await response.text();
+                try {
+                    const url = await getDownloadURL(ref(storage, selectedMaterialPath));
+                    const response = await fetch(url);
+                    context = await response.text();
+                } catch (e) {
+                    console.error("Error fetching material:", e);
+                    alert("Could not load study material. Please try again.");
+                    return;
+                }
             }
             const finalTopic = topic || selectedMaterialPath.split('/').pop().replace('.txt', '');
             generateQuizFromTopic(finalTopic, context);
