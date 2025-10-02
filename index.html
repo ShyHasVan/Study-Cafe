@@ -37,6 +37,20 @@
             background-repeat: no-repeat;
             background-size: 100% 40%, 100% 60%;
         }
+        .game-container.edit-mode::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 40%; /* Start grid on the floor */
+            width: 100%;
+            height: 60%; /* Cover the floor area */
+            background-image:
+                linear-gradient(to right, rgba(92, 61, 46, 0.2) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(92, 61, 46, 0.2) 1px, transparent 1px);
+            background-size: 20px 20px;
+            pointer-events: none;
+            z-index: 0;
+        }
         .modal-backdrop {
             background-color: rgba(0,0,0,0.5);
             backdrop-filter: blur(4px);
@@ -301,6 +315,7 @@
         const ANIMAL_EMOJIS = ['🦉', '🦊', '🐰', '🐻', '🐼', '🐸', '🐵', '🐯', '🦁', '🐨'];
         const FOOD_EMOJIS = ['☕️', '🥐', '🍰', '🍪', '🍩', '🧃', '🍵', '🥪'];
         const WALL_HEIGHT_PERCENT = 40; // The top 40% of the game area is wall
+        const GRID_SIZE = 20;
         const FURNITURE_CATALOG = {
             'table1': { name: 'Wooden Table', type: 'table', cost: 0, image: 'assets/Wooden_table.png', size: {w: 100, h: 60} },
             'table2': { name: 'Study Desk', type: 'table', cost: 50, emoji: '📚', size: {w: 100, h: 60} },
@@ -344,13 +359,13 @@
         function createInitialGameState() {
             const tableTemplate = FURNITURE_CATALOG['table1'];
             const counterTemplate = FURNITURE_CATALOG['counter'];
-            // Adjusted Y positions to be on the floor
+            // Adjusted Y positions to be on the floor and on grid
             const initialFurniture = [
                 { ...tableTemplate, id: 'table1_1', catalogId: 'table1', pos: { x: 100, y: 220 } },
                 { ...tableTemplate, id: 'table1_2', catalogId: 'table1', pos: { x: 300, y: 220 } },
-                { ...tableTemplate, id: 'table1_3', catalogId: 'table1', pos: { x: 550, y: 220 } },
-                { ...tableTemplate, id: 'table1_4', catalogId: 'table1', pos: { x: 100, y: 350 } },
-                { ...counterTemplate, id: 'counter_1', catalogId: 'counter', pos: { x: 325, y: 400 } }
+                { ...tableTemplate, id: 'table1_3', catalogId: 'table1', pos: { x: 540, y: 220 } },
+                { ...tableTemplate, id: 'table1_4', catalogId: 'table1', pos: { x: 100, y: 340 } },
+                { ...counterTemplate, id: 'counter_1', catalogId: 'counter', pos: { x: 320, y: 400 } }
             ];
             return {
                 knowledgePoints: 0,
@@ -617,7 +632,7 @@
                 hostEl.className = 'absolute text-5xl';
                 hostEl.style.left = `${counter.pos.x + (counter.size.w / 2) - 30}px`;
                 hostEl.style.top = `${counter.pos.y - 40}px`;
-                hostEl.style.zIndex = '0';
+                hostEl.style.zIndex = '2'; // Ensure host is above decorations but below customers
                 hostEl.style.filter = 'drop-shadow(0 2px 3px rgba(0,0,0,0.2))';
                 gameArea.appendChild(hostEl);
 
@@ -675,6 +690,10 @@
             const gameRect = gameArea.getBoundingClientRect();
             let newX = clientX - gameRect.left - offset.x;
             let newY = clientY - gameRect.top - offset.y;
+            
+            // Snap to grid
+            newX = Math.round(newX / GRID_SIZE) * GRID_SIZE;
+            newY = Math.round(newY / GRID_SIZE) * GRID_SIZE;
 
             // Constrain X to game area boundaries
             newX = Math.max(0, Math.min(newX, gameArea.offsetWidth - dragTarget.offsetWidth));
@@ -723,7 +742,7 @@
                     el.classList.add('flex', 'items-center', 'justify-center');
                 }
                 
-                el.style.zIndex = item.type === 'decoration' ? '0' : '1';
+                el.style.zIndex = item.type === 'decoration' ? '1' : '2';
                 el.addEventListener('mousedown', startDrag);
                 el.addEventListener('touchstart', startDrag);
                 gameArea.appendChild(el);
@@ -803,7 +822,7 @@
             if (item && (gameState.unlockedItems || []).includes(itemId) && gameState.knowledgePoints >= item.cost) {
                 gameState.knowledgePoints -= item.cost;
                 if (!gameState.furniture) gameState.furniture = [];
-                const newItem = { id: `${itemId}_${Date.now()}`, catalogId: itemId, ...item, pos: { x: 50, y: 210 } }; // Ensure new items spawn on floor
+                const newItem = { id: `${itemId}_${Date.now()}`, catalogId: itemId, ...item, pos: { x: 40, y: 220 } }; // Ensure new items spawn on floor grid
                 gameState.furniture.push(newItem);
                 saveGameState();
                 closeShop();
